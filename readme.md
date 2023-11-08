@@ -23,7 +23,7 @@ $ export PATH=<firtool-download-path>/circt-full-shared-linux-x64/firtol-1.56.1/
 
 Clone the code
 ```bash
-  $ git clone https://github.com/madhava-c/playground.git
+  $ git clone https://github.com/morphingmachines/playground.git
   $ cd playground
   $ git submodule update --init
 ```
@@ -61,7 +61,7 @@ object playground extends CommonModule {
 ## IDE support
 For mill use
 ```bash
-mill mill.bsp.BSP/install
+./mill mill.bsp.BSP/install
 ```
 then open by your favorite IDE, which supports [BSP](https://build-server-protocol.github.io/) 
 
