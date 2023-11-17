@@ -14,15 +14,18 @@ import $file.dependencies.`rocket-chip`.common
 // Global Scala Version
 object ivys {
   val sv = "2.13.10"
+  val cv = "5.1.0"
   // the first version in this Map is the mainly supported version which will be used to run tests
   val chiselCrossVersions = Map(
     //"3.6.0" -> (ivy"edu.berkeley.cs::chisel3:3.6.0", ivy"edu.berkeley.cs:::chisel3-plugin:3.6.0"),
     "5.0.0" -> (ivy"org.chipsalliance::chisel:5.0.0", ivy"org.chipsalliance:::chisel-plugin:5.0.0"),
+    "5.1.0" -> (ivy"org.chipsalliance::chisel:5.1.0", ivy"org.chipsalliance:::chisel-plugin:5.1.0"),
     //"6.0.0-M3" -> (ivy"org.chipsalliance::chisel:6.0.0-M3", ivy"org.chipsalliance:::chisel-plugin:6.0.0-M3"),
   )
 
   val chiseltestCrossVersions = Map(
     "5.0.0" -> ivy"edu.berkeley.cs::chiseltest:5.0.0",
+    "5.1.0" -> ivy"edu.berkeley.cs::chiseltest:5.0.2",
   )
   
   val upickle = ivy"com.lihaoyi::upickle:1.3.15"
@@ -46,11 +49,9 @@ object ivys {
 trait CommonModule extends ScalaModule {
   override def scalaVersion = ivys.sv
 
-  def chiselIvy = Some(ivys.chiselCrossVersions("5.0.0")._1)
-  //def chiselIvy = Some(ivys.chiselCrossVersions("6.0.0-M3")._1)
+  def chiselIvy = Some(ivys.chiselCrossVersions(ivys.cv)._1)
 
-  def chiselPluginIvy = Some(ivys.chiselCrossVersions("5.0.0")._2)
-  //def chiselPluginIvy = Some(ivys.chiselCrossVersions("6.0.0-M3")._2)
+  def chiselPluginIvy = Some(ivys.chiselCrossVersions(ivys.cv)._2)
 
   override def ivyDeps = T(super.ivyDeps() ++ chiselIvy)
   override def scalacPluginIvyDeps  = T(super.scalacPluginIvyDeps() ++ chiselPluginIvy)
@@ -77,11 +78,9 @@ object myrocketchip extends dependencies.`rocket-chip`.common.RocketChipModule w
 	
   def chiselPluginJar = None		
 
-  def chiselIvy = Some(ivys.chiselCrossVersions("5.0.0")._1)
-  //def chiselIvy = Some(ivys.chiselCrossVersions("6.0.0-M3")._1)
+  def chiselIvy = Some(ivys.chiselCrossVersions(ivys.cv)._1)
 
-  def chiselPluginIvy = Some(ivys.chiselCrossVersions("5.0.0")._2)
-  //def chiselPluginIvy = Some(ivys.chiselCrossVersions("6.0.0-M3")._2)
+  def chiselPluginIvy = Some(ivys.chiselCrossVersions(ivys.cv)._2)
 
   override def ivyDeps = T(super.ivyDeps() ++ chiselIvy)
   override def scalacPluginIvyDeps  = T(super.scalacPluginIvyDeps() ++ chiselPluginIvy)
@@ -117,11 +116,10 @@ object shells extends CommonModule with SbtModule {
 object myhardfloat extends ScalaModule with SbtModule with PublishModule {
   override def millSourcePath = os.pwd / "dependencies" / "berkeley-hardfloat"
   def scalaVersion = ivys.sv
-  def chiselIvy = Some(ivys.chiselCrossVersions("5.0.0")._1)
-  //def chiselIvy = Some(ivys.chiselCrossVersions("6.0.0-M3")._1)
+  
+  def chiselIvy = Some(ivys.chiselCrossVersions(ivys.cv)._1)
 
-  def chiselPluginIvy = Some(ivys.chiselCrossVersions("5.0.0")._2)
-  //def chiselPluginIvy = Some(ivys.chiselCrossVersions("6.0.0-M3")._2)
+  def chiselPluginIvy = Some(ivys.chiselCrossVersions(ivys.cv)._2)
 
   override def ivyDeps = T(super.ivyDeps() ++ chiselIvy)
   override def scalacPluginIvyDeps  = T(super.scalacPluginIvyDeps() ++ chiselPluginIvy)
