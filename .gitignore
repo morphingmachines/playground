@@ -3,6 +3,9 @@ out/
 .idea/
 .mill-bin/
 
+**/.bloop
+**/.metals
+
 # vim misc
 *.orig
 *.swp

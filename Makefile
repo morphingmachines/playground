@@ -9,5 +9,8 @@ compile:
 rtl:
 	$(MILL) -i -j 0 playground.verilog
 
+rocketchip-scaladoc:
+	$(MILL) -i -j 0 myrocketchip.docJar
+
 clean:
 	git clean -fd
