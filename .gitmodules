@@ -6,7 +6,7 @@
 	url = https://github.com/ucb-bar/berkeley-hardfloat.git
 [submodule "rocket-chip"]
 	path = dependencies/rocket-chip
-	url = https://github.com/chipsalliance/rocket-chip.git
+	url = git@github.com:morphingmachines/rocket-chip.git
 	branch = dev
 [submodule "rocket-chip-blocks"]
 	path = dependencies/rocket-chip-blocks
