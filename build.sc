@@ -145,6 +145,12 @@ object myhardfloat extends ScalaModule with SbtModule with PublishModule {
   )
 }
 
+object testchipip extends CommonModule with SbtModule {
+  override def millSourcePath = os.pwd / "dependencies" / "testchipip"
+  override def moduleDeps = super.moduleDeps ++ Seq(myrocketchip, blocks)
+}
+
+
 // Dummy
 
 object playground extends CommonModule {

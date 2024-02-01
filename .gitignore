@@ -6,6 +6,8 @@ out/
 **/.bloop
 **/.metals
 
+.vscode/extensions.json
+
 # vim misc
 *.orig
 *.swp
