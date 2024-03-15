@@ -4,8 +4,8 @@
             "name": "Linux",
             "includePath": [
                 "${workspaceFolder}/**",
-                //These include files are geneated by riscv-isa-sim (spike) installation
-                "${workspaceFolder}/../rocket-tools-install/include"
+                // These include files are geneated by riscv-isa-sim (spike) installation
+                "${RISCV}/include"
             ],
             "defines": [],
             "compilerPath": "/usr/bin/clang",
