@@ -14,18 +14,16 @@ import $file.dependencies.`rocket-chip`.common
 // Global Scala Version
 object ivys {
   val sv = "2.13.12"
-  val cv = "5.1.0"
+  val cv = "6.0.0"
   // the first version in this Map is the mainly supported version which will be used to run tests
   val chiselCrossVersions = Map(
-    //"3.6.0" -> (ivy"edu.berkeley.cs::chisel3:3.6.0", ivy"edu.berkeley.cs:::chisel3-plugin:3.6.0"),
     "5.0.0" -> (ivy"org.chipsalliance::chisel:5.0.0", ivy"org.chipsalliance:::chisel-plugin:5.0.0"),
-    "5.1.0" -> (ivy"org.chipsalliance::chisel:5.1.0", ivy"org.chipsalliance:::chisel-plugin:5.1.0")
-    //"6.0.0-M3" -> (ivy"org.chipsalliance::chisel:6.0.0-M3", ivy"org.chipsalliance:::chisel-plugin:6.0.0-M3"),
+    "6.0.0" -> (ivy"org.chipsalliance::chisel:6.0.0", ivy"org.chipsalliance:::chisel-plugin:6.0.0")
   )
 
   val chiseltestCrossVersions = Map(
     "5.0.0" -> ivy"edu.berkeley.cs::chiseltest:5.0.0",
-    "5.1.0" -> ivy"edu.berkeley.cs::chiseltest:5.0.2"
+    "6.0.0" -> ivy"edu.berkeley.cs::chiseltest:6.0.0"
   )
 
   val upickle = ivy"com.lihaoyi::upickle:1.3.15"
@@ -191,7 +189,6 @@ object playground extends CommonModule {
       "firtool",
       elaborate().path / s"${lazymodule.split('.').last}.fir",
       "--disable-annotation-unknown",
-      "-dedup",
       "-O=debug",
       "--split-verilog",
       "--preserve-values=named",
