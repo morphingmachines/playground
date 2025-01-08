@@ -22,3 +22,6 @@
 [submodule "dependencies/testchipip"]
 	path = dependencies/testchipip
 	url = https://github.com/ucb-bar/testchipip.git
+[submodule "dependencies/chipyard"]
+	path = dependencies/chipyard
+	url = git@github.com:ucb-bar/chipyard.git

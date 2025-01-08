@@ -10,7 +10,7 @@ out/
 
 # vim misc
 *.orig
-*.swp
+**/*.swp
 # idea
 .idea_modules
 
