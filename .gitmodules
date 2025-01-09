@@ -25,3 +25,6 @@
 [submodule "dependencies/chipyard"]
 	path = dependencies/chipyard
 	url = git@github.com:ucb-bar/chipyard.git
+[submodule "dependencies/diplomacy"]
+	path = dependencies/diplomacy
+	url = git@github.com:chipsalliance/diplomacy.git

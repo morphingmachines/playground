@@ -9,6 +9,7 @@ import publish._
 import mill.bsp._
 // input build.sc from each repositories.
 import $file.dependencies.cde.build
+import $file.dependencies.diplomacy.common
 import $file.dependencies.`rocket-chip`.common
 
 // Global Scala Version
@@ -25,6 +26,8 @@ object ivys {
     "5.0.0" -> ivy"edu.berkeley.cs::chiseltest:5.0.0",
     "6.0.0" -> ivy"edu.berkeley.cs::chiseltest:6.0.0"
   )
+
+  val sourcecode = ivy"com.lihaoyi::sourcecode:0.3.1"
 
   val upickle = ivy"com.lihaoyi::upickle:1.3.15"
   val oslib = ivy"com.lihaoyi::os-lib:0.7.8"
@@ -66,6 +69,17 @@ object mycde extends dependencies.cde.build.CDE with PublishModule {
   override def millSourcePath = os.pwd / "dependencies" / "cde" / "cde"
 }
 
+object mydiplomacy extends dependencies.diplomacy.common.DiplomacyModule with CommonModule {
+  override def millSourcePath = os.pwd / "dependencies" / "diplomacy" / "diplomacy"
+  override def scalaVersion = ivys.sv
+  def chiselModule = None
+  def chiselPluginJar = None
+  def chiselIvy = Some(ivys.chiselCrossVersions(ivys.cv)._1)
+  def chiselPluginIvy = Some(ivys.chiselCrossVersions(ivys.cv)._2)
+  def sourcecodeIvy = ivys.sourcecode
+  def cdeModule = mycde
+}
+
 object myrocketchip extends dependencies.`rocket-chip`.common.RocketChipModule with SbtModule {
 
   override def millSourcePath = os.pwd / "dependencies" / "rocket-chip"
@@ -87,6 +101,8 @@ object myrocketchip extends dependencies.`rocket-chip`.common.RocketChipModule w
 
   def hardfloatModule: ScalaModule = myhardfloat
 
+  def diplomacyModule: ScalaModule = mydiplomacy
+ 
   def cdeModule: ScalaModule = mycde
 
   def mainargsIvy = ivys.mainargs
