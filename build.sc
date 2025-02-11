@@ -16,10 +16,13 @@ import $file.dependencies.`rocket-chip`.common
 object ivys {
   val sv = "2.13.12"
   val cv = "6.0.0"
+  val cv1 = "3.6.1" // chipyard.tapeout
+  val sv1 = "2.13.10" // chipyard.tapeout
   // the first version in this Map is the mainly supported version which will be used to run tests
   val chiselCrossVersions = Map(
     "5.0.0" -> (ivy"org.chipsalliance::chisel:5.0.0", ivy"org.chipsalliance:::chisel-plugin:5.0.0"),
-    "6.0.0" -> (ivy"org.chipsalliance::chisel:6.0.0", ivy"org.chipsalliance:::chisel-plugin:6.0.0")
+    "6.0.0" -> (ivy"org.chipsalliance::chisel:6.0.0", ivy"org.chipsalliance:::chisel-plugin:6.0.0"),
+    "3.6.1" -> (ivy"edu.berkeley.cs::chisel3:3.6.1", ivy"edu.berkeley.cs:::chisel-plugin:3.6.1") // chipyard.tapeout
   )
 
   val chiseltestCrossVersions = Map(
@@ -164,10 +167,33 @@ object testchipip extends CommonModule with SbtModule {
   override def moduleDeps = super.moduleDeps ++ Seq(myrocketchip, blocks)
 }
 
-object chipyardTapeout extends CommonModule with SbtModule {
-  override def millSourcePath = os.pwd / "dependencies" / "chipyard"
-  override def moduleDeps = super.moduleDeps
-}
+//object chipyardAnnotations extends CommonModule with SbtModule {
+//  override def millSourcePath = os.pwd / "dependencies" / "chipyard" / "tools" / "stage"
+//  override def moduleDeps     = super.moduleDeps ++ Seq(myrocketchip)
+//}
+
+//object chipyardTapeout extends CommonModule with SbtModule {
+//  override def millSourcePath = os.pwd / "dependencies" / "chipyard" / "tools" / "tapeout"
+//  //override def scalaVersion = ivys.sv1 // stuck on chisel3 2.13.10
+//  //override def chiselIvy = Some(ivys.chiselCrossVersions(ivys.cv1)._1) // stuck on chisel3 and SFC
+//  //override def chiselPluginIvy = Some(ivys.chiselCrossVersions(ivys.cv1)._1)
+//  def playjsonIvy = ivys.playjson
+//  override def moduleDeps = super.moduleDeps
+//}
+
+//object chipyardTapeout extends SbtModule {
+//  override def millSourcePath = os.pwd / "dependencies" / "chipyard" / "tools" / "tapeout"
+//  override def scalaVersion = ivys.sv1 // stuck on chisel3 2.13.10
+//  def chiselIvy = Some(ivys.chiselCrossVersions(ivys.cv1)._1) // stuck on chisel3 and SFC
+//  def chiselPluginIvy = Some(ivys.chiselCrossVersions(ivys.cv1)._1)
+//  def playjsonIvy = ivys.playjson
+//  override def moduleDeps = super.moduleDeps
+//}
+
+//object chipyardTapeout extends CommonModule with SbtModule {
+//  override def millSourcePath = os.pwd / "dependencies" / "chipyard" / "tools"
+//  override def moduleDeps     = super.moduleDeps ++ Seq("com.typesafe.play" %% "play-json" % "2.9.2")
+//}
 
 
 // Dummy
@@ -202,13 +228,19 @@ object playground extends CommonModule {
       ),
       workingDir = os.pwd
     )
+    println(s" Elaborate done: ${T.dest}")
     PathRef(T.dest)
+  }
+
+  def chiselAnno = T {
+    os.walk(elaborate().path).collectFirst { case p if p.last.endsWith("anno.json") => p }.map(PathRef(_)).get
   }
 
   def verilog = T {
     os.proc(
       "firtool",
       elaborate().path / s"${lazymodule.split('.').last}.fir",
+     // s"--annotation-file=${chiselAnno().path}",
       "--disable-annotation-unknown",
       "-O=debug",
       "--split-verilog",
