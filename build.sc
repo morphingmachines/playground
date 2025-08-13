@@ -164,12 +164,6 @@ object testchipip extends CommonModule with SbtModule {
   override def moduleDeps = super.moduleDeps ++ Seq(myrocketchip, blocks)
 }
 
-object chipyardTapeout extends CommonModule with SbtModule {
-  override def millSourcePath = os.pwd / "dependencies" / "chipyard"
-  override def moduleDeps = super.moduleDeps
-}
-
-
 // Dummy
 
 object playground extends CommonModule {
