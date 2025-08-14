@@ -2,36 +2,37 @@
 import mill._
 import mill.define.Sources
 import mill.modules.Util
-import scalalib._
+import mill.scalalib.scalafmt.ScalafmtModule
+//import mill.scalalib.SbtModule
+import mill.scalalib._
+import mill.scalalib.publish._
 // Hack
-import publish._
 // support BSP
 import mill.bsp._
 // input build.sc from each repositories.
 import $file.dependencies.cde.build
+import $file.dependencies.diplomacy.common
 import $file.dependencies.`rocket-chip`.common
+
+import $file.builddefs
 
 // Global Scala Version
 object ivys {
-  val sv = "2.13.12"
-  val cv = "6.0.0"
+  val sv = "2.13.16"
+  val cv = "6.7.0"
   // the first version in this Map is the mainly supported version which will be used to run tests
   val chiselCrossVersions = Map(
-    "5.0.0" -> (ivy"org.chipsalliance::chisel:5.0.0", ivy"org.chipsalliance:::chisel-plugin:5.0.0"),
-    "6.0.0" -> (ivy"org.chipsalliance::chisel:6.0.0", ivy"org.chipsalliance:::chisel-plugin:6.0.0")
+    "6.7.0" -> (ivy"org.chipsalliance::chisel:6.7.0", ivy"org.chipsalliance:::chisel-plugin:6.7.0")
   )
 
-  val chiseltestCrossVersions = Map(
-    "5.0.0" -> ivy"edu.berkeley.cs::chiseltest:5.0.0",
-    "6.0.0" -> ivy"edu.berkeley.cs::chiseltest:6.0.0"
-  )
+  val sourcecode = ivy"com.lihaoyi::sourcecode:0.3.1"
 
   val upickle = ivy"com.lihaoyi::upickle:1.3.15"
   val oslib = ivy"com.lihaoyi::os-lib:0.7.8"
   val pprint = ivy"com.lihaoyi::pprint:0.6.6"
   val utest = ivy"com.lihaoyi::utest:0.7.10"
   val jline = ivy"org.scala-lang.modules:scala-jline:2.12.1"
-  val scalatest = ivy"org.scalatest::scalatest:3.2.15"
+  val scalatest = ivy"org.scalatest::scalatest:3.2.19"
   val scalatestplus = ivy"org.scalatestplus::scalacheck-1-14:3.1.1.1"
   val scalacheck = ivy"org.scalacheck::scalacheck:1.14.3"
   val scopt = ivy"com.github.scopt::scopt:3.7.1"
@@ -62,8 +63,21 @@ object macros extends dependencies.`rocket-chip`.common.MacrosModule with SbtMod
   def scalaReflectIvy = ivys.scalaReflect
 }
 
+
 object mycde extends dependencies.cde.build.CDE with PublishModule {
   override def millSourcePath = os.pwd / "dependencies" / "cde" / "cde"
+  def scalaVersion: T[String] = T(ivys.sv)
+}
+
+object mydiplomacy extends dependencies.diplomacy.common.DiplomacyModule with CommonModule {
+  override def millSourcePath = os.pwd / "dependencies" / "diplomacy" / "diplomacy"
+  override def scalaVersion = ivys.sv
+  def chiselModule = None
+  def chiselPluginJar = None
+  def chiselIvy = Some(ivys.chiselCrossVersions(ivys.cv)._1)
+  def chiselPluginIvy = Some(ivys.chiselCrossVersions(ivys.cv)._2)
+  def sourcecodeIvy = ivys.sourcecode
+  def cdeModule = mycde
 }
 
 object myrocketchip extends dependencies.`rocket-chip`.common.RocketChipModule with SbtModule {
@@ -87,6 +101,8 @@ object myrocketchip extends dependencies.`rocket-chip`.common.RocketChipModule w
 
   def hardfloatModule: ScalaModule = myhardfloat
 
+  def diplomacyModule: ScalaModule = mydiplomacy
+ 
   def cdeModule: ScalaModule = mycde
 
   def mainargsIvy = ivys.mainargs
@@ -148,11 +164,10 @@ object testchipip extends CommonModule with SbtModule {
   override def moduleDeps = super.moduleDeps ++ Seq(myrocketchip, blocks)
 }
 
-
 // Dummy
 
 object playground extends CommonModule {
-  override def moduleDeps = super.moduleDeps ++ Seq(myrocketchip, inclusivecache, blocks, shells)
+  override def moduleDeps = super.moduleDeps ++ Seq(mycde, mydiplomacy, myrocketchip, inclusivecache, blocks, shells)
 
   // add some scala ivy module you like here.
   override def ivyDeps = Agg(
