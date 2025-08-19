@@ -1,0 +1,54 @@
+
+REQUIRED_FIRTOOL_VERSION := CIRCT firtool-1.62.1
+FIRTOOL_OK := $(shell firtool --version 2>/dev/null | grep -Fxq "$(REQUIRED_FIRTOOL_VERSION)" && echo yes || echo no)
+
+
+REQUIRED_VERILATOR_VERSION := Verilator 5.012 2023-06-13 rev v5.012
+VERILATOR_OK := $(shell verilator --version 2>/dev/null | grep -Fxq "$(REQUIRED_VERILATOR_VERSION)" && echo yes || echo no)
+
+
+.PHONY: check-firtool
+check-firtool: ## Check for correct version of fir-tool
+ifeq ($(FIRTOOL_OK),no)
+	$(error "Error: Expected firtool version: $(REQUIRED_FIRTOOL_VERSION) not found")
+endif
+
+.PHONY: check-verilator
+check-verilator: check-firtool ## Check for correct version of Verilator
+ifeq ($(VERILATOR_OK),no)
+	$(error "Error: Expected verilator version: $(REQUIRED_VERILATOR_VERSION) not found")
+endif
+
+.PHONY: lint
+lint: ## Formats code using scalafmt and scalafix
+	$(MILL) $(project).fix
+	$(MILL) $(project).reformat
+
+.PHONY: lint-test
+lint-test: ## Formats test code using scalafmt and scalafix
+	$(MILL) $(project).test.fix
+	$(MILL) $(project).test.reformat
+
+.PHONY: console
+console: ## Start a scala console within this project
+	$(MILL) -i $(project).console
+
+.PHONY: scaladoc
+scaladoc: ## Generates Scala API documentation that can view in a browser
+	$(MILL) -i -j 0 $(project).docJar
+	@echo "Scala documentation HTML files generated in ./out/$(project)/docJar.dest/javadoc"
+
+.PHONY: clean
+clean:   ## Clean all generated files
+	$(MILL) clean
+	@rm -rf test_run_dir generated_sv_dir
+	@rm -rf out
+
+.PHONY: help
+help:
+	@echo "Makefile targets:"
+	@echo ""
+	@grep -h -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | sort | awk 'BEGIN {FS = "[:##]"}; {printf "\033[36m%-20s\033[0m %s\n", $$1, $$4}'
+	@echo ""
+
+.DEFAULT_GOAL := help
