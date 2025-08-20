@@ -4,9 +4,9 @@ import chisel3.stage.ChiselGeneratorAnnotation
 import chisel3.stage.phases.Elaborate
 import firrtl.AnnotationSeq
 import firrtl.options.TargetDirAnnotation
-import freechips.rocketchip.diplomacy.LazyModule
 import mainargs._
 import org.chipsalliance.cde.config.{Config, Parameters}
+import org.chipsalliance.diplomacy.lazymodule.LazyModule
 
 object Main {
   @main def elaborate(

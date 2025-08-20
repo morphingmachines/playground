@@ -16,7 +16,7 @@
 	url = https://github.com/chipsalliance/rocket-chip-inclusive-cache.git
 [submodule "rocket-chip-fpga-shells"]
 	path = dependencies/rocket-chip-fpga-shells
-	url = https://github.com/chipsalliance/rocket-chip-fpga-shells.git
+	url = git@github.com:morphingmachines/rocket-chip-fpga-shells.git
 [submodule "dependencies/rocket-chip"]
 	branch = dev
 [submodule "dependencies/testchipip"]
