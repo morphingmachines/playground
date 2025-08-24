@@ -16,6 +16,7 @@ import $file.builddefs
 import $file.dependencies.cde.build
 import $file.dependencies.diplomacy.common
 import $file.dependencies.`rocket-chip`.common
+import $file.dependencies.`berkeley-hardfloat`.common
 
 
 // Global Scala Version
@@ -90,10 +91,14 @@ object shells extends builddefs.CommonModule with SbtModule {
 }
 
 // UCB
-object myhardfloat extends ScalaModule with SbtModule with PublishModule {
-  override def millSourcePath = os.pwd / "dependencies" / "berkeley-hardfloat"
+object myhardfloat extends dependencies.`berkeley-hardfloat`.common.HardfloatModule with PublishModule {
+  override def millSourcePath = os.pwd / "dependencies" / "berkeley-hardfloat" / "hardfloat"
   def scalaVersion = builddefs.ivys.sv
 
+  def chiselModule = None
+
+  def chiselPluginJar = None
+  
   def chiselIvy = Some(builddefs.ivys.chiselCrossVersions(builddefs.ivys.cv)._1)
 
   def chiselPluginIvy = Some(builddefs.ivys.chiselCrossVersions(builddefs.ivys.cv)._2)
