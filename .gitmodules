@@ -24,7 +24,7 @@
 	url = https://github.com/ucb-bar/testchipip.git
 [submodule "dependencies/chipyard"]
 	path = dependencies/chipyard
-	url = git@github.com:ucb-bar/chipyard.git
+	url = git@github.com:morphingmachines/chipyard.git
 [submodule "dependencies/diplomacy"]
 	path = dependencies/diplomacy
 	url = git@github.com:chipsalliance/diplomacy.git
