@@ -28,3 +28,6 @@
 [submodule "dependencies/diplomacy"]
 	path = dependencies/diplomacy
 	url = git@github.com:chipsalliance/diplomacy.git
+[submodule "dependencies/emitrtl"]
+	path = dependencies/emitrtl
+	url = git@github.com:morphingmachines/emitrtl.git
