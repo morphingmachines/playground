@@ -19,9 +19,6 @@
 	url = git@github.com:morphingmachines/rocket-chip-fpga-shells.git
 [submodule "dependencies/rocket-chip"]
 	branch = dev
-[submodule "dependencies/testchipip"]
-	path = dependencies/testchipip
-	url = https://github.com/ucb-bar/testchipip.git
 [submodule "dependencies/chipyard"]
 	path = dependencies/chipyard
 	url = git@github.com:morphingmachines/chipyard.git
