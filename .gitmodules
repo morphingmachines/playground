@@ -28,3 +28,6 @@
 [submodule "dependencies/emitrtl"]
 	path = dependencies/emitrtl
 	url = git@github.com:morphingmachines/emitrtl.git
+[submodule "dependencies/testchipip"]
+	path = dependencies/testchipip
+	url = git@github.com:morphingmachines/testchipip.git
