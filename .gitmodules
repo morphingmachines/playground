@@ -8,9 +8,6 @@
 	path = dependencies/rocket-chip
 	url = git@github.com:morphingmachines/rocket-chip.git
 	branch = dev
-[submodule "rocket-chip-blocks"]
-	path = dependencies/rocket-chip-blocks
-	url = https://github.com/chipsalliance/rocket-chip-blocks.git
 [submodule "rocket-chip-inclusive-cache"]
 	path = dependencies/rocket-chip-inclusive-cache
 	url = git@github.com:morphingmachines/rocket-chip-inclusive-cache.git
@@ -31,3 +28,6 @@
 [submodule "dependencies/testchipip"]
 	path = dependencies/testchipip
 	url = git@github.com:morphingmachines/testchipip.git
+[submodule "dependencies/rocket-chip-blocks"]
+	path = dependencies/rocket-chip-blocks
+	url = https://github.com/morphingmachines/rocket-chip-blocks.git
