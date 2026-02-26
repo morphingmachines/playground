@@ -10,7 +10,7 @@
 	branch = dev
 [submodule "rocket-chip-blocks"]
 	path = dependencies/rocket-chip-blocks
-	url = https://github.com/chipsalliance/rocket-chip-blocks.git
+	url = https://github.com/morphingmachines/rocket-chip-blocks.git
 [submodule "rocket-chip-inclusive-cache"]
 	path = dependencies/rocket-chip-inclusive-cache
 	url = git@github.com:morphingmachines/rocket-chip-inclusive-cache.git
@@ -21,7 +21,7 @@
 	branch = dev
 [submodule "dependencies/testchipip"]
 	path = dependencies/testchipip
-	url = https://github.com/ucb-bar/testchipip.git
+	url = https://github.com/morphingmachines/testchipip.git
 [submodule "dependencies/chipyard"]
 	path = dependencies/chipyard
 	url = git@github.com:morphingmachines/chipyard.git
