@@ -150,6 +150,7 @@ object chipyardTapeout extends builddefs.CommonModule with SbtModule {
 
 object emitrtl extends builddefs.CommonModule with SbtModule {
   override def millSourcePath = os.pwd / "dependencies" / "emitrtl"
+  override def ivyDeps = T(super.ivyDeps() ++ Agg(builddefs.ivys.scalatest))
   override def moduleDeps = super.moduleDeps ++ Seq(mycde, mydiplomacy, myrocketchip, chipyardAnnotations, chipyardTapeout)
 }
 
