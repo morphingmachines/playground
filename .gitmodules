@@ -7,7 +7,6 @@
 [submodule "rocket-chip"]
 	path = dependencies/rocket-chip
 	url = git@github.com:morphingmachines/rocket-chip.git
-	branch = dev
 [submodule "rocket-chip-blocks"]
 	path = dependencies/rocket-chip-blocks
 	url = https://github.com/morphingmachines/rocket-chip-blocks.git
