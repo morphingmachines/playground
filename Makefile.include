@@ -1,3 +1,14 @@
+# --- self-location -----------------------------------------------------------
+# Absolute path of the playground checkout that supplied this file.
+# MUST be the first thing in this file, and nothing above it may `include`
+# anything: MAKEFILE_LIST is appended to just *before* make begins reading a
+# makefile, so $(lastword ...) here is "./../playground/Makefile.include" as
+# written in the consumer's `-include` line, and $(abspath $(dir ...)) resolves
+# it against make's cwd (= the consumer repo root). `:=` is mandatory -- with a
+# recursive `=` this would be re-expanded later, after the rest of the consumer
+# Makefile has been read, and would point at the consumer repo root instead.
+PLAYGROUND_DIR := $(abspath $(dir $(lastword $(MAKEFILE_LIST))))
+GIT_HOOKS_DIR  := $(PLAYGROUND_DIR)/git-hooks
 
 REQUIRED_FIRTOOL_VERSION := CIRCT firtool-1.62.1
 FIRTOOL_OK := $(shell firtool --version 2>/dev/null | grep -Fxq "$(REQUIRED_FIRTOOL_VERSION)" && echo yes || echo no)
@@ -28,6 +39,74 @@ lint: ## Formats code using scalafmt and scalafix
 lint-test: ## Formats test code using scalafmt and scalafix
 	$(MILL) $(project).test.fix
 	$(MILL) $(project).test.reformat
+
+.PHONY: install-hooks
+install-hooks: ## Route this repo's git hooks to playground/git-hooks (FORCE=1 to override)
+	@set -e; \
+	command -v git >/dev/null 2>&1 || { echo "install-hooks: git not found" >&2; exit 1; }; \
+	gv=$$(git --version | awk '{print $$3}'); \
+	printf '2.9.0\n%s\n' "$$gv" | sort -V -C || { \
+	  echo "install-hooks: git $$gv is too old. core.hooksPath needs git >= 2.9, and" >&2; \
+	  echo "               older git SILENTLY IGNORES it -- you would think hooks were on." >&2; \
+	  exit 1; }; \
+	test -d "$(GIT_HOOKS_DIR)" || { \
+	  echo "install-hooks: $(GIT_HOOKS_DIR) not found." >&2; \
+	  echo "               Is the playground checkout a sibling of this repo, and up to date?" >&2; \
+	  exit 1; }; \
+	test -x "$(GIT_HOOKS_DIR)/pre-commit" || { \
+	  echo "install-hooks: $(GIT_HOOKS_DIR)/pre-commit is not executable." >&2; \
+	  echo "               git skips non-executable hooks SILENTLY. Fix it in the playground repo:" >&2; \
+	  echo "                 chmod +x git-hooks/pre-commit && git update-index --chmod=+x git-hooks/pre-commit" >&2; \
+	  exit 1; }; \
+	hooks=$$(git rev-parse --git-path hooks); \
+	shadowed=$$(find "$$hooks" -maxdepth 1 -type f -perm -u+x ! -name '*.sample' -printf '%f\n' 2>/dev/null \
+	            | sort | while read -r h; do test -e "$(GIT_HOOKS_DIR)/$$h" || echo "$$h"; done); \
+	if [ -n "$$shadowed" ]; then \
+	  echo "install-hooks: setting core.hooksPath DISABLES everything in $$hooks." >&2; \
+	  echo "               These live hooks would stop running:" >&2; \
+	  echo "$$shadowed" | sed 's/^/                   /' >&2; \
+	  echo "" >&2; \
+	  echo "               Almost always these are git-lfs hooks (post-checkout/post-commit/" >&2; \
+	  echo "               post-merge/pre-push). Losing them means LFS pointers instead of" >&2; \
+	  echo "               real files, and nothing warns you. Options:" >&2; \
+	  echo "                 a) re-home them:  git config --local core.hooksPath \"$(GIT_HOOKS_DIR)\" \\" >&2; \
+	  echo "                                   && git lfs install --force" >&2; \
+	  echo "                 b) accept the loss:  make install-hooks FORCE=1" >&2; \
+	  [ -n "$(FORCE)" ] || exit 1; \
+	  echo "install-hooks: FORCE=1 -- continuing; the hooks above will NOT run." >&2; \
+	fi; \
+	git config --local core.hooksPath "$(GIT_HOOKS_DIR)"; \
+	echo "install-hooks: core.hooksPath = $$(git config --local --get core.hooksPath)"; \
+	echo "install-hooks: this is an ABSOLUTE path baked into .git/config."; \
+	echo "               If you move or rename $(PLAYGROUND_DIR), git stops running the"; \
+	echo "               hooks with no error at all. Re-run 'make install-hooks' after any"; \
+	echo "               move, and 'make check-hooks' to confirm."; \
+	echo "install-hooks: run 'make lint' once by hand before your first commit -- the first"; \
+	echo "               mill run downloads the launcher and resolves deps, and needs network."
+
+.PHONY: uninstall-hooks
+uninstall-hooks: ## Stop using playground/git-hooks in this repo
+	@set -e; \
+	cur=$$(git config --local --get core.hooksPath || true); \
+	if [ -z "$$cur" ]; then echo "uninstall-hooks: core.hooksPath not set locally; nothing to do."; exit 0; fi; \
+	git config --local --unset-all core.hooksPath; \
+	echo "uninstall-hooks: unset core.hooksPath (was $$cur)"; \
+	echo "uninstall-hooks: $$(git rev-parse --git-path hooks) is live again."; \
+	echo "                 If this repo uses git-lfs, run 'git lfs install' to be sure its"; \
+	echo "                 hooks are back in place."
+
+.PHONY: check-hooks
+check-hooks: ## Verify the playground git hooks are actually active in this repo
+	@cur=$$(git config --get core.hooksPath || true); \
+	if [ -z "$$cur" ]; then \
+	  echo "check-hooks: NOT INSTALLED (core.hooksPath unset). Run 'make install-hooks'."; exit 1; fi; \
+	if [ ! -x "$$cur/pre-commit" ]; then \
+	  echo "check-hooks: BROKEN -- core.hooksPath=$$cur but $$cur/pre-commit is missing or"; \
+	  echo "             not executable. Git is silently running NO pre-commit hook."; exit 1; fi; \
+	if [ "$$cur" != "$(GIT_HOOKS_DIR)" ]; then \
+	  echo "check-hooks: MISMATCH -- core.hooksPath=$$cur but this repo builds against"; \
+	  echo "             $(PLAYGROUND_DIR). You are running hooks from a different playground."; exit 1; fi; \
+	echo "check-hooks: OK -- $$cur/pre-commit"
 
 .PHONY: console
 console: ## Start a scala console within this project

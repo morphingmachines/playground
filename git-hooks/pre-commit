@@ -1,0 +1,314 @@
+#!/usr/bin/env bash
+#
+# playground/git-hooks/pre-commit
+#
+# Shared by every morphingmachines consumer repo via core.hooksPath
+# (see `make install-hooks` in playground/Makefile.include).
+#
+# `make lint` (mill scalafix + scalafmt) rewrites sources IN PLACE and always
+# exits 0, so it can never fail on unformatted code by itself. This hook turns
+# it into a gate: it formats what you staged, re-stages exactly those files, and
+# leaves everything else alone.
+#
+# Contract:
+#   * ~10ms and zero side effects when no Scala sources are staged.
+#   * Re-stages ONLY files that were already staged. Anything else mill
+#     reformatted is left dirty in the working tree and reported loudly.
+#   * Refuses (exit 1) rather than guessing whenever re-staging could commit
+#     content the author deliberately did not stage.
+#   * Never blocks a commit for an *infrastructure* reason (missing playground,
+#     no lint target, ancient bash). Only a real scalafix/scalafmt/compile
+#     failure, or a partially staged file, blocks.
+#
+# Escape hatches: SKIP_LINT=1 git commit ...   |   git commit --no-verify
+# Knobs:          LINT_HOOK_DEBUG=1            LINT_HOOK_TIMEOUT=<sec, default 600>
+
+set -euo pipefail
+
+readonly HOOK=pre-commit
+
+say()  { printf '%s: %s\n'                 "$HOOK" "$*" >&2; }
+warn() { printf '%s: WARNING: %s\n'        "$HOOK" "$*" >&2; }
+skip() { printf '%s: skipping lint (%s)\n' "$HOOK" "$*" >&2; exit 0; }
+die()  { printf '%s: ERROR: %s\n'          "$HOOK" "$*" >&2; exit 1; }
+list() { printf '    %s\n' "$@" >&2; }
+
+[[ ${SKIP_LINT:-0} == 0 ]] || skip "SKIP_LINT=${SKIP_LINT}"
+[[ ${LINT_HOOK_DEBUG:-0} == 0 ]] || set -x
+
+# `mapfile -d ''` (NUL-delimited reads) needs bash >= 4.4, as does safe
+# expansion of empty arrays under `set -u`. Degrade to a no-op rather than
+# blocking commits on a box with an old bash.
+if (( BASH_VERSINFO[0] < 4 || (BASH_VERSINFO[0] == 4 && BASH_VERSINFO[1] < 4) )); then
+  warn "bash ${BASH_VERSION} is too old for this hook (needs >= 4.4)."
+  skip "unsupported bash"
+fi
+
+# --- locations ----------------------------------------------------------------
+# Git already runs hooks from the top of the working tree, but `make` here
+# depends on cwd (MILL = ./../playground/mill) and mill's out/ cache is
+# cwd-relative, so be explicit. Absolutise the git pointers first: they are
+# relative (".git/index") when GIT_DIR is relative, and a cd would break them.
+if [[ -n ${GIT_INDEX_FILE:-} && ${GIT_INDEX_FILE} != /* ]]; then
+  GIT_INDEX_FILE="$PWD/$GIT_INDEX_FILE"; export GIT_INDEX_FILE
+fi
+if [[ -n ${GIT_DIR:-} && ${GIT_DIR} != /* ]]; then
+  GIT_DIR="$PWD/$GIT_DIR"; export GIT_DIR
+fi
+
+toplevel=$(git rev-parse --show-toplevel) || die "not inside a git working tree"
+cd "$toplevel"
+
+# The hook knows where it lives, because core.hooksPath is absolute.
+hook_home=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd -P)
+
+# --- modes we must not run in -------------------------------------------------
+# `git commit -- <paths>` / `--only` / `--interactive` build a throwaway index
+# at $GIT_DIR/next-index-NNN and point GIT_INDEX_FILE at it. In that mode
+# "staged" stops meaning what this hook assumes: files staged in the *real*
+# index look like unstaged noise, and anything we `git add` lands in a temp
+# index that git afterwards reconciles with the real one. Don't guess.
+# (`git commit -a` points GIT_INDEX_FILE at .git/index.lock instead -- that one
+#  is fine: the temp index already matches the worktree, so nothing below
+#  misfires, and `git add` writing through the lock is well-trodden.)
+if [[ -n ${GIT_INDEX_FILE:-} && $(basename -- "$GIT_INDEX_FILE") == next-index* ]]; then
+  skip "path-limited commit (git commit --only / -- <paths>); use a plain 'git commit' to get auto-formatting"
+fi
+
+# Rewriting sources in the middle of a conflict resolution is how you lose
+# work. rebase/cherry-pick/revert normally pass --no-verify internally, so this
+# mainly catches the manual `git commit` after resolving conflicts.
+for marker in MERGE_HEAD CHERRY_PICK_HEAD REVERT_HEAD rebase-merge rebase-apply sequencer BISECT_LOG; do
+  if [[ -e $(git rev-parse --git-path "$marker") ]]; then
+    skip "$marker present -- merge/rebase/cherry-pick in progress; not rewriting files mid-operation"
+  fi
+done
+
+tmp=$(mktemp -d) || die "mktemp failed"
+trap 'rm -rf -- "$tmp"' EXIT
+
+# --- what is staged -----------------------------------------------------------
+# ONE git call, so the common case (no Scala staged at all) costs ~10ms.
+#   --diff-filter=d : everything except deletions (lowercase = exclude).
+#                     A deleted .scala needs no formatting; a rename reports
+#                     only the post-image path, which is the one on disk.
+#   -z              : NUL-terminated, so spaces/newlines/unicode are exact.
+#                     Never read this through $(...) -- bash strips NULs.
+#   '*.scala' '*.sc': git pathspec wildcards are fnmatch WITHOUT FNM_PATHNAME,
+#                     so `*` crosses `/` and this does match nested paths.
+git diff --cached --name-only -z --diff-filter=d -- '*.scala' '*.sc' \
+  > "$tmp/staged" || die "git diff --cached failed"
+
+staged_all=(); mapfile -d '' -t staged_all < "$tmp/staged"
+(( ${#staged_all[@]} )) || exit 0      # <-- the fast path. No make, no mill.
+
+# --- scope split --------------------------------------------------------------
+# Every consumer repo's main module is
+#     object <project> extends ... SbtModule with ScalafmtModule with ScalafixModule
+#     override def millSourcePath = os.pwd
+# so `mill <project>.{fix,reformat}` covers src/main/scala only, and the nested
+# `object test` covers src/test/scala only. Anything else staged -- build.sc,
+# a root-level inConsole.scala, sb_sim/, doc/ -- is NOT in millSourcePath, so
+# `make lint` would provably not touch it and triggering mill on it is a pure
+# waste. Prefix-match in bash (exact byte comparison, no glob ambiguity).
+in_scope()    { case $1 in src/main/scala/*|src/test/scala/*) return 0;; *) return 1;; esac; }
+is_test_src() { case $1 in src/test/scala/*)                  return 0;; *) return 1;; esac; }
+
+staged_scope=(); staged_test=(); staged_oos=()
+for f in "${staged_all[@]}"; do
+  if in_scope "$f"; then
+    staged_scope+=("$f")
+    is_test_src "$f" && staged_test+=("$f")
+  else
+    staged_oos+=("$f")
+  fi
+done
+
+if (( ${#staged_oos[@]} )); then
+  say "not linted (outside millSourcePath -- 'make lint' would never touch them):"
+  list "${staged_oos[@]}"
+fi
+(( ${#staged_scope[@]} )) || exit 0
+
+# --- refuse on partial staging ------------------------------------------------
+# `make lint` rewrites the WORKING TREE, not the index. If a staged file also
+# has unstaged changes, `git add`-ing it after formatting would silently pull
+# the hunks the author deliberately left out into this commit. There is no safe
+# automatic fix (stash --keep-index + pop conflicts on reformatted files, and
+# cannot even run while git holds .git/index.lock under `git commit -a`), so
+# refuse and hand the decision back.
+#
+# No --diff-filter here on purpose: a staged-then-deleted file must be caught.
+git diff --name-only -z -- '*.scala' '*.sc' > "$tmp/dirty_pre" \
+  || die "git diff failed"
+dirty_pre=(); mapfile -d '' -t dirty_pre < "$tmp/dirty_pre"
+
+declare -A dirty_pre_set=()
+for f in "${dirty_pre[@]}"; do dirty_pre_set["$f"]=1; done
+
+partial=()
+for f in "${staged_scope[@]}"; do
+  [[ -n ${dirty_pre_set[$f]:-} ]] && partial+=("$f")
+done
+
+if (( ${#partial[@]} )); then
+  printf '\n' >&2
+  die "$(cat <<EOF
+these staged files also have unstaged changes:
+$(printf '    %s\n' "${partial[@]}")
+
+'make lint' formats the working tree, so to commit formatted code this hook
+would have to 'git add' each whole file -- sweeping the hunks you deliberately
+left unstaged into this commit. Refusing.
+
+Pick one:
+    git add -- <file>                     stage the rest, commit it all
+    git stash push --keep-index -- <file> park the unstaged work; commit; git stash pop
+    SKIP_LINT=1 git commit ...            commit unformatted, tidy up later
+    git commit --no-verify ...            git's own escape hatch
+
+(If you are running 'git commit --amend', this can look surprising: during an
+ amend '--cached' is the whole diff of the commit being replaced. The refusal
+ is still correct -- those unstaged hunks really would be swept in.)
+EOF
+)"
+fi
+
+# --- can we lint at all? ------------------------------------------------------
+[[ -f Makefile ]] || skip "no Makefile in $toplevel"
+
+have_target() {          # 0 = exists, 1 = no such target, 2 = makefile broken
+  local target=$1 out rc=0
+  out=$(make -n -- "$target" 2>&1) || rc=$?
+  (( rc == 0 )) && return 0
+  [[ $out == *"No rule to make target"* ]] && return 1
+  printf '%s\n' "$out" >&2
+  return 2
+}
+
+rc=0; have_target lint || rc=$?
+case $rc in
+  1)
+    # Two very different causes that look identical to make. The consumer
+    # Makefile uses `-include`, which NEVER errors, so a missing playground
+    # checkout silently produces a Makefile with no `lint` target.
+    if [[ ! -f ../playground/Makefile.include ]]; then
+      warn "no 'lint' target: ../playground/Makefile.include is missing, so the"
+      warn "  Makefile's '-include' was silently skipped. Expected a playground"
+      warn "  checkout as a sibling of $toplevel. This hook came from $hook_home."
+      skip "playground checkout not found where the Makefile expects it"
+    fi
+    skip "this repo's Makefile has no 'lint' target (installed in 'playground' itself?)"
+    ;;
+  2) warn "'make -n lint' failed to parse this Makefile (output above)."
+     skip "Makefile is not usable right now" ;;
+esac
+
+# Cross-check that the Makefile and the hooks agree on which playground to use.
+# A stale absolute core.hooksPath is otherwise completely invisible.
+if [[ -d ../playground ]]; then
+  sibling=$(cd ../playground && pwd -P)
+  if [[ $sibling != "$hook_home" ]]; then
+    warn "this repo builds against playground at $sibling, but these hooks come"
+    warn "  from $hook_home. Re-run 'make install-hooks'."
+  fi
+fi
+
+# mill formats whatever is on disk, including files git has never seen; those
+# can never show up in a `git diff`, so say so before claiming a complete report.
+git ls-files -o --exclude-standard -z -- 'src/main/scala/*.scala' 'src/test/scala/*.scala' \
+  > "$tmp/untracked" || :
+untracked=(); mapfile -d '' -t untracked < "$tmp/untracked"
+(( ${#untracked[@]} == 0 )) || \
+  warn "${#untracked[@]} untracked Scala file(s) under src/ will also be reformatted in place (not reported below)."
+
+# --- run the lint -------------------------------------------------------------
+run_make() {
+  local target=$1 rc=0 t=${LINT_HOOK_TIMEOUT:-600}
+  say "running 'make $target' (mill; a cold out/ can take several minutes)"
+  if command -v timeout >/dev/null 2>&1; then
+    timeout --signal=INT "$t" make -- "$target" >&2 || rc=$?
+  else
+    make -- "$target" >&2 || rc=$?
+  fi
+  (( rc == 0 )) && return 0
+  if (( rc == 124 )); then
+    die "'make $target' timed out after ${t}s. mill serialises on out/ -- is Metals/BSP
+       or another mill/make running in this repo? Close it, or raise LINT_HOOK_TIMEOUT.
+       Nothing was staged."
+  fi
+  die "'make $target' failed (exit $rc). That is a scalafix/scalafmt/compile error,
+       not a formatting nit -- the output is above. Fix it and retry, or commit with
+       --no-verify. Nothing was staged; some files may already be reformatted on disk."
+}
+
+run_make lint
+
+if (( ${#staged_test[@]} )); then
+  rc=0; have_target lint-test || rc=$?
+  if (( rc == 0 )); then
+    run_make lint-test
+  else
+    warn "src/test sources are staged but this repo has no usable 'lint-test' target;"
+    warn "  test sources were NOT formatted. (Some repos' build.sc has no 'object test'.)"
+  fi
+fi
+
+# --- re-stage & report --------------------------------------------------------
+git diff --name-only -z -- '*.scala' '*.sc' > "$tmp/dirty_post" || die "git diff failed"
+dirty_post=(); mapfile -d '' -t dirty_post < "$tmp/dirty_post"
+
+declare -A staged_set=()
+for f in "${staged_scope[@]}"; do staged_set["$f"]=1; done
+
+restage=(); collateral=()
+for f in "${dirty_post[@]}"; do
+  in_scope "$f" || continue
+  if [[ -n ${staged_set[$f]:-} ]]; then
+    # It was staged and, per the refusal above, index==worktree before lint.
+    # So lint is the only thing that can have made it dirty.
+    restage+=("$f")
+  elif [[ -z ${dirty_pre_set[$f]:-} ]]; then
+    collateral+=("$f")
+  fi
+done
+
+if (( ${#restage[@]} )); then
+  # ':(literal)' because `git add` treats its arguments as PATHSPECS: a file
+  # named Foo[1].scala would otherwise be read as a glob and match nothing.
+  # --pathspec-from-file avoids any ARGV length ceiling as a bonus.
+  printf ':(literal)%s\0' "${restage[@]}" \
+    | git add --pathspec-from-file=- --pathspec-file-nul -- \
+    || die "re-staging failed; nothing was added. Inspect 'git status' before retrying."
+
+  say "reformatted and re-staged ${#restage[@]} file(s):"
+  list "${restage[@]}"
+  say "review the auto-changes before finishing:  git diff --cached   (or commit with -v)"
+else
+  say "staged Scala sources were already formatted."
+fi
+
+if (( ${#collateral[@]} )); then
+  {
+    printf '\n'
+    printf '================================================================================\n'
+    printf '%s: %s\n' "$HOOK" "'make lint' formats the WHOLE module, not just your staged files."
+    printf '%s: %s\n' "$HOOK" "It reformatted ${#collateral[@]} file(s) you had NOT staged. They are now"
+    printf '%s: %s\n' "$HOOK" "modified in your working tree and are DELIBERATELY NOT in this commit:"
+    printf '        %s\n' "${collateral[@]}"
+    printf '%s: %s\n' "$HOOK" "This repo has a formatting backlog. Deal with them explicitly:"
+    printf '%s: %s\n' "$HOOK" "    git add -- <files> && git commit --amend      fold into this commit"
+    printf '%s: %s\n' "$HOOK" "    git checkout -- <files>                       discard the reformat"
+    printf '%s: %s\n' "$HOOK" "    ... or land a one-off 'make lint' commit and be rid of this forever."
+    printf '================================================================================\n\n'
+  } >&2
+fi
+
+# If formatting reverted the only staged change, git is about to print a bare
+# "nothing to commit" and the author will have no idea why.
+if (( ${#restage[@]} )) && git diff --cached --quiet 2>/dev/null; then
+  warn "the index is now identical to HEAD -- formatting undid your only staged change."
+  warn "  git will refuse this commit as empty. That is expected, not a hook bug."
+fi
+
+exit 0
