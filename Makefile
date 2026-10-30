@@ -1,32 +1,18 @@
+project = playground
+
 MILL = ${PWD}/mill
 
+# Shared targets and Chisel version / firtool handling, same as consumer repos
+-include ./Makefile.include
 
-REQUIRED_FIRTOOL_VERSION := CIRCT firtool-1.62.1
-FIRTOOL_OK := $(shell firtool --version 2>/dev/null | grep -Fxq "$(REQUIRED_FIRTOOL_VERSION)" && echo yes || echo no)
-
-bsp:
+bsp: ## Generate BSP config for IDEs
 	$(MILL) -i mill.bsp.BSP/install
 
-compile:
+compile: ## Compile all modules
 	$(MILL) -i -j 0 __.compile
 
-console:
-	$(MILL) -i -j 0 playground.console
-
-rtl: check-firtool
+rtl: check-firtool ## Elaborate playground's top and run firtool
 	$(MILL) -i -j 0 playground.verilog
 
-rocketchip-scaladoc:
+rocketchip-scaladoc: ## Generate rocket-chip Scala API documentation
 	$(MILL) -i -j 0 myrocketchip.docJar
-
-.PHONY: clean
-clean:   ## Clean all generated files
-	$(MILL) clean
-	@rm -rf out
-
-
-.PHONY: check-firtool
-check-firtool: ## Check for correct version of fir-tool
-ifeq ($(FIRTOOL_OK),no)
-	$(error "Error: Expected firtool version: $(REQUIRED_FIRTOOL_VERSION) not found")
-endif

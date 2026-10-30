@@ -1,7 +1,7 @@
 package playground.elaborate
 
 import chisel3.stage.ChiselGeneratorAnnotation
-import chisel3.stage.phases.Elaborate
+import chisel3.stage.phases.{Convert, Elaborate}
 import firrtl.AnnotationSeq
 import firrtl.options.TargetDirAnnotation
 import mainargs._
@@ -28,7 +28,7 @@ object Main {
 
     Seq(
       new Elaborate,
-      new chisel3.hack.Convert
+      new Convert
     ).foldLeft(
       Seq(
         TargetDirAnnotation(dir),
@@ -39,7 +39,8 @@ object Main {
         case firrtl.stage.FirrtlCircuitAnnotation(circuit) =>
           os.write(os.Path(dir) / s"${lazyModule.moduleName}.fir", circuit.serialize)
           None
-        case _: chisel3.stage.DesignAnnotation[_] => None
+        case _: chisel3.stage.DesignAnnotation[_]  => None
+        case _: chisel3.stage.ChiselCircuitAnnotation => None
         case a => Some(a)
       }
   }

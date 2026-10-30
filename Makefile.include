@@ -10,8 +10,52 @@
 PLAYGROUND_DIR := $(abspath $(dir $(lastword $(MAKEFILE_LIST))))
 GIT_HOOKS_DIR  := $(PLAYGROUND_DIR)/git-hooks
 
-REQUIRED_FIRTOOL_VERSION := CIRCT firtool-1.62.1
-FIRTOOL_OK := $(shell firtool --version 2>/dev/null | grep -Fxq "$(REQUIRED_FIRTOOL_VERSION)" && echo yes || echo no)
+# Chisel 7 is selected by USE_CHISEL7 being *present* in the environment, even if
+# empty -- same test as builddefs.sc (sys.env.contains), so make and mill agree.
+ifneq ($(origin USE_CHISEL7),undefined)
+CHISEL_VERSION := chisel7
+else
+CHISEL_VERSION := chisel6
+endif
+
+# --- mill server vs. Chisel version -------------------------------------------
+# builddefs.sc reads USE_CHISEL7 via sys.env, i.e. the env of the mill *server*
+# JVM as it was when the server started, and the server caches the compiled
+# build. A running server therefore keeps building the old Chisel version after
+# USE_CHISEL7 changes. Stop this repo's server whenever the Chisel version differs from the
+# one recorded in $(MILL_SERVER_STAMP); the next mill call starts a fresh one.
+# The JVM is killed directly rather than via `mill shutdown`: that command must
+# load build.sc first (fails once checkOutDir() throws) and would spawn a server
+# when none is running. Only covers mill runs started through make.
+MILL_SERVER_STAMP := out/mill-server-mode
+ifneq ($(shell cat $(MILL_SERVER_STAMP) 2>/dev/null),$(CHISEL_VERSION))
+$(info Chisel version is $(CHISEL_VERSION): stopping this repo's mill server, if any)
+_ := $(shell \
+  for p in $$(pgrep -u "$$(id -u)" -f '[m]ill\.runner\.MillServerMain'); do \
+    [ "$$(cat /proc/$$p/comm 2>/dev/null)" = java ] || continue; \
+    [ "$$(readlink /proc/$$p/cwd)" = "$(CURDIR)" ] || continue; \
+    kill $$p 2>/dev/null; \
+    for i in $$(seq 50); do kill -0 $$p 2>/dev/null || break; sleep 0.1; done; \
+  done; \
+  mkdir -p out && echo $(CHISEL_VERSION) > $(MILL_SERVER_STAMP))
+endif
+
+# Chisel 7 needs the firtool its release was tested with
+ifeq ($(CHISEL_VERSION),chisel7)
+FIRTOOL_VERSION := 1.149.0
+else
+FIRTOOL_VERSION := 1.62.1
+endif
+REQUIRED_FIRTOOL_VERSION := CIRCT firtool-$(FIRTOOL_VERSION)
+
+# Put the matching firtool first on PATH for every recipe (mill -> runMain -> firtool).
+# Default layout: firtool-<ver>/ next to playground; override FIRTOOL_BIN to point elsewhere.
+FIRTOOL_BIN ?= $(abspath $(PLAYGROUND_DIR)/../firtool-$(FIRTOOL_VERSION)/bin)
+ifneq ($(wildcard $(FIRTOOL_BIN)/firtool),)
+export PATH := $(FIRTOOL_BIN):$(PATH)
+endif
+# make < 4.4 does not pass exported vars to $(shell), so give it PATH explicitly
+FIRTOOL_OK := $(shell PATH='$(PATH)' firtool --version 2>/dev/null | grep -Fxq "$(REQUIRED_FIRTOOL_VERSION)" && echo yes || echo no)
 
 
 REQUIRED_VERILATOR_VERSION := Verilator 5.012 2023-06-13 rev v5.012
@@ -51,7 +95,7 @@ install-hooks: ## Route this repo's git hooks to playground/git-hooks (FORCE=1 t
 	  exit 1; }; \
 	test -d "$(GIT_HOOKS_DIR)" || { \
 	  echo "install-hooks: $(GIT_HOOKS_DIR) not found." >&2; \
-	  echo "               Is the playground checkout a sibling of this repo, and up to date?" >&2; \
+	  echo "               Is playground checked out next to this repo, and up to date?" >&2; \
 	  exit 1; }; \
 	test -x "$(GIT_HOOKS_DIR)/pre-commit" || { \
 	  echo "install-hooks: $(GIT_HOOKS_DIR)/pre-commit is not executable." >&2; \
@@ -109,7 +153,7 @@ check-hooks: ## Verify the playground git hooks are actually active in this repo
 	echo "check-hooks: OK -- $$cur/pre-commit"
 
 .PHONY: console
-console: ## Start a scala console within this project
+console: ## Start a scala console within this repo
 	$(MILL) -i $(project).console
 
 .PHONY: scaladoc
