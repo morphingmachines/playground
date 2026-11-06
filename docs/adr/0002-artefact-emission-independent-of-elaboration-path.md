@@ -46,7 +46,7 @@ Map and decision detail: [Wayfinder: flexible artefact emission for emitrtl Tops
   - On the `ChipyardStage` path, the handle is the stage's own instance. emitrtl matches `DesignAnnotation` by type in `ChipyardStage.execute`'s result and follows its design's `.wrapper`. The annotation has 1 field on chisel6 and 2 on chisel7, which is why it is matched by type. This works only when `--top-module` is a `LazyModule` class. The reflection build stays, so the Top is built twice. That cost is documented.
 - The registry is drained (`ElaborationArtefacts.files = Nil`) after writing, not before. Draining before would drop entries added while the Top is built, such as `l2.json`. Draining after also stops one Top's artefacts leaking into the next and resets regmap counter drift.
 - A pure `Artefacts` object does the matching, duplicate removal, naming, writing and draining. It can be unit-tested without elaborating a Top. The traits only gather inputs and call it.
-- On the `ChipyardStage` path, the order is: the stage runs and writes today's `<out_dir>/<outFileName>.<key>` files, then emitrtl writes `artefacts/`, then emitrtl drains the registry.
+- On the `ChipyardStage` path, the order is: emitrtl drains the entries left by the reflection build, the stage runs and writes today's `<out_dir>/<outFileName>.<key>` files, then emitrtl writes `artefacts/`, then emitrtl drains the registry. The reflection-built Top is never elaborated, so its entries must not reach either output.
 
 ### Legacy names
 
@@ -97,6 +97,8 @@ trait SynthToplevel { def chipyardAnno() = { val annos = stage.execute(...); emi
 
 ## Consequences
 
+- graphML node ids come from diplomacy's global `LazyModule` index, which is never reset. On the `ChipyardStage` path the reflection build runs first, so the stage's graphML ids are offset from the `ChiselStage` path's. The graph structure is the same.
+- chipyard's `PreElaboration` builds the root inside `val gen`, so on the `ChipyardStage` path the root is named `gen` rather than the Top's own `val` name. graphML edge labels such as `Slave Name = gen` differ as a result.
 - Building two `LazyModule`s before elaborating either one is unsupported. The first drain would take the second Top's construction-time entries.
 - `PlusArgArtefacts` and `BindingScope.bindingScopes` cannot be cleared, so plusArgs leak across Tops in one JVM.
 - It is unconfirmed whether the forked `runMain` JVM under the mill 0.11.4 server sees an `EMITRTL_ARTEFACTS` value that changed after the server started. The acceptance runs must check this. The fallback is `mill -i`.
