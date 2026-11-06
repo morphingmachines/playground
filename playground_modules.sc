@@ -157,5 +157,7 @@ trait PlaygroundModules extends Module {
     override def ivyDeps = T(super.ivyDeps() ++ Agg(builddefs.ivys.scalatest))
     override def moduleDeps =
       super.moduleDeps ++ Seq(mycde, mydiplomacy, myrocketchip, chipyardAnnotations, chipyardTapeout)
+
+    object test extends SbtModuleTests with TestModule.ScalaTest
   }
 }

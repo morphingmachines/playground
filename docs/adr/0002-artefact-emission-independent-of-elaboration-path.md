@@ -12,7 +12,7 @@ Map and decision detail: [Wayfinder: flexible artefact emission for emitrtl Tops
 
 ### Selection
 
-- An artefact selection is a list of **artefact kinds**. The kinds are a closed set: `Regmap`, `GraphML`, `Dts`, `DtsJson`, `MemMap`, `PlusArgs`, `Axi4IdMap`, `L2`, `FpgaShell` and `FpgaIp`. Each kind is defined by the registry-key suffixes it matches. `ByPattern(glob)` covers producers outside the set, such as consumer-repo IP.
+- An artefact selection is a list of **artefact kinds**. The kinds are a closed set: `Regmap`, `GraphML`, `Dts`, `DtsJson`, `MemMap`, `PlusArgs`, `Axi4IdMap`, `L2`, `FpgaShell` and `FpgaIp`. Each kind is defined by the registry-key suffixes it matches. `ByPattern(glob)` covers producers outside the set, such as consumer-repo IP. The glob is matched against the bare registry key, such as `l2.json`, not the output file name.
 - An empty list selects everything: all registry entries plus whole-Top graphML. The list is additive only, so there is no "all except X".
 - A Top sets its selection with `override def artefactKinds = Seq(...)`. No trait sugar (`WithGraphML` and similar) is provided.
 - A kind that is requested but not produced only logs a warning. Examples are `Dts` on a Top without a `BaseSubsystem`, and `Regmap` with no TileLink register router.
@@ -24,7 +24,7 @@ Map and decision detail: [Wayfinder: flexible artefact emission for emitrtl Tops
 - The environment variable `EMITRTL_ARTEFACTS` overrides the selection, for example `EMITRTL_ARTEFACTS=regmap make rtl TARGET=CE`.
   - A non-empty value replaces the Top's `artefactKinds`.
   - An unset or empty value falls back to `artefactKinds`, because a Makefile `?=` exports an empty value.
-- The syntax is a comma-separated list of kebab-case kind names, matched case-insensitively: `regmap`, `graphml`, `dts`, `dts-json`, `mem-map`, `plus-args`, `axi4-id-map`, `l2`, `fpga-shell`, `fpga-ip`. Patterns need an explicit `glob:` prefix, as in `glob:*.l2.json`. emitrtl never infers a pattern from glob characters.
+- The syntax is a comma-separated list of kebab-case kind names, matched case-insensitively: `regmap`, `graphml`, `dts`, `dts-json`, `mem-map`, `plus-args`, `axi4-id-map`, `l2`, `fpga-shell`, `fpga-ip`. Patterns need an explicit `glob:` prefix, as in `glob:*l2.json`. emitrtl never infers a pattern from glob characters.
 - An unknown name fails the run before elaboration, and the error lists the valid names.
 - The variable applies to every Top elaborated in the JVM. The legacy shims ignore it.
 
@@ -61,7 +61,7 @@ object ArtefactKind {
   case object Regmap extends ArtefactKind; case object GraphML extends ArtefactKind
   /* Dts, DtsJson, MemMap, PlusArgs, Axi4IdMap, L2, FpgaShell, FpgaIp */
   final case class ByPattern(glob: String) extends ArtefactKind
-  def parse(s: String): Either[String, Seq[ArtefactKind]] // "regmap,glob:*.l2.json"; Left lists valid names
+  def parse(s: String): Either[String, Seq[ArtefactKind]] // "regmap,glob:*l2.json"; Left lists valid names
 }
 object Artefacts {
   def emit(entries: Seq[(String, () => String)], root: Option[LazyModule],

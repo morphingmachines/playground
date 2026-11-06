@@ -33,3 +33,15 @@ _Avoid_: Chisel mode, Chisel 7 toggle
 **Top**:
 The named design-and-configuration pair that one elaboration produces RTL for.
 _Avoid_: target, lazymodule, lazyTop, DUT
+
+**Artefact**:
+A non-RTL file emitted by elaborating a Top, such as a register map, diplomacy graph or device tree. Follows chipyard's own usage.
+_Avoid_: collateral, artifact, side file
+
+**Artefact kind**:
+A category of artefact, such as register map or diplomacy graph, that a Top can request.
+_Avoid_: extension, type, suffix
+
+**Artefact selection**:
+The artefact kinds requested for one elaboration of a Top, set in the Top or overridden at run time.
+_Avoid_: artefact filter, artefact list, selector
