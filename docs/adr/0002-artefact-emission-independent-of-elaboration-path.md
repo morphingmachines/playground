@@ -1,5 +1,5 @@
 ---
-status: proposed
+status: accepted
 ---
 
 # Artefact emission is independent of the elaboration path
@@ -101,7 +101,7 @@ trait SynthToplevel { def chipyardAnno() = { val annos = stage.execute(...); emi
 - chipyard's `PreElaboration` builds the root inside `val gen`, so on the `ChipyardStage` path the root is named `gen` rather than the Top's own `val` name. graphML edge labels such as `Slave Name = gen` differ as a result.
 - Building two `LazyModule`s before elaborating either one is unsupported. The first drain would take the second Top's construction-time entries.
 - `PlusArgArtefacts` and `BindingScope.bindingScopes` cannot be cleared, so plusArgs leak across Tops in one JVM.
-- It is unconfirmed whether the forked `runMain` JVM under the mill 0.11.4 server sees an `EMITRTL_ARTEFACTS` value that changed after the server started. The acceptance runs must check this. The fallback is `mill -i`.
+- The forked `runMain` JVM under the mill 0.11.4 server sees an `EMITRTL_ARTEFACTS` value that changed after the server started. No `mill -i` fallback is needed.
 - The design must hold on both chisel6 (`tools/stage`) and chisel7 (`tools/stage-chisel7`).
 
 ## Acceptance
@@ -114,3 +114,12 @@ The design is accepted when it holds on the consumer repo [ceTile](https://githu
 4. Elaborating `CE` and then `CERoCCIO` in one JVM leaves no artefact from `CE` in the output for `CERoCCIO`.
 5. ceTile's `src/main/scala/Top.scala` compiles unchanged. `genDiplomacyGraph()` and `chipyardAnno()` still write today's paths, and `synthFirrtl2synthSV()` and `chipyardMacroCompiler(...)` still succeed.
 6. Steps 1 to 5 are repeated for `TARGET=CERoCCIO` on both paths.
+
+The acceptance runs passed on 2026-11-08, with ceTile at `bde4c83` and playground at `98164d9` (emitrtl `df7c3ec`). Only Chisel 7 was exercised. The design was not re-checked on Chisel 6 here.
+
+1. Both paths wrote `CeTop.graphml`, `CeTop.0x2000000.0.regmap.json` and `CeTop.0x400000.0.regmap.json`. These are all the artefacts `CeTop` produces. The stage wrote no registry files to `<out_dir>` other than these two regmaps.
+2. The file sets matched by name. The regmaps matched byte for byte. The graphML files had the same 80 nodes and 41 edges, but differed in node ids and in the root name (`lazyTop` or `gen`). This is the graphML exception described in Consequences, so criterion 2 holds for graphML only up to those two differences.
+3. `EMITRTL_ARTEFACTS=regmap` wrote only the two regmaps on both paths. `EMITRTL_ARTEFACTS=graphml` wrote only `CeTop.graphml`. An unknown name failed the run before elaboration. These runs went through a mill server whose own environment had no `EMITRTL_ARTEFACTS`.
+4. `CE` and then `CERoCCIO` in one JVM wrote the same `CERoCCIO` file set as a run of `CERoCCIO` alone. The two Tops' regmaps are identical, so content deduplication alone would hide a leak. rocket-chip's `RegisterRouter` picks the next free key suffix in `ElaborationArtefacts`, though, so a leaked `CE` entry would have moved `CERoCCIO`'s keys to `.1.regmap.json`.
+5. `genDiplomacyGraph()` and `chipyardAnno()` still wrote `<out_dir>/CeTop.*`, and `synthFirrtl2synthSV()` and `chipyardMacroCompiler(...)` succeeded.
+6. Results 1 to 5 hold for both `TARGET=CE` and `TARGET=CERoCCIO`.
