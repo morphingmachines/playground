@@ -41,7 +41,7 @@ This elaborates `freechips.rocketchip.system.ExampleRocketSystem` with `playgrou
 
 ## Chisel 7
 
-Chisel 6.7.0 is the default. Setting the `USE_CHISEL7` environment variable switches to Chisel 7.13.0, matching chipyard's `USE_CHISEL7` option.
+Chisel 6.7.0 is the default. Setting the `USE_CHISEL7` environment variable switches to Chisel 7.13.0, matching chipyard's `USE_CHISEL7` option. For what changes for RTL, verification and physical design, see the [Chisel 7 migration notes](docs/chisel7-migration.md).
 
 ```bash
 USE_CHISEL7=1 make rtl
